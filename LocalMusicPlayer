@@ -1,0 +1,195 @@
+注册com组件：AxWindowsMediaPlayer
+拖放到窗体中
+操作播放器代码：
+public class Player
+    {
+        private AxWMPLib.AxWindowsMediaPlayer myPlayer;
+        private string[] playList;
+        private int numOfMusic;
+        private int currentPlay;
+        public int index = 0;
+
+        public int NumOfMusic
+        {
+            get
+            {
+                return numOfMusic;
+            }
+        }
+
+        public WMPLib.WMPPlayState playstate
+        {
+            get
+            {
+                return myPlayer.playState;
+            }
+        }
+
+        public string PlayList(int num)
+        {
+            return playList[num];
+        }
+        public Player()
+        {
+            myPlayer = new AxWMPLib.AxWindowsMediaPlayer();
+        }
+        public Player(AxWMPLib.AxWindowsMediaPlayer mediaPlayer)
+        {
+            myPlayer = mediaPlayer;
+            playList = new string[1000];
+            numOfMusic = 0;
+        }
+        private void InitProgress(ProgressBar progress)
+        {
+            progress.Value = 0;
+        }
+
+        public void AddFile(string path)
+        {
+            if (numOfMusic < 1000)
+            {
+                playList[numOfMusic] = path;
+                numOfMusic++;
+            }
+        }
+
+        public void DelFile(int selectNum)
+        {
+            for (int i = selectNum; i <= numOfMusic - 1; i++)
+            {
+                playList[i] = playList[i + 1];
+            }
+            numOfMusic--;
+        }
+
+        public void play(int selectNum)
+        {
+            myPlayer.URL = playList[selectNum];
+            currentPlay = selectNum;
+            index = selectNum;
+        }
+        public void Play()
+        {
+            myPlayer.Ctlcontrols.play();
+        }
+        public void Pause()
+        {
+            myPlayer.Ctlcontrols.pause();
+        }
+        public void UpVoice()
+        {
+            myPlayer.settings.volume += 2;
+        }
+        public void DownVoice()
+        {
+            myPlayer.settings.volume -= 2;
+        }
+        public int PrevPlay(int type)
+        {
+            /* type = 0 顺序
+
+          　　type = 1 重复播放全部
+          　　type = 2 重复播放一首
+          　　type = 3 随机播放
+
+          　　*/
+
+            switch (type)
+            {
+                case 0:
+                case 1:
+                    currentPlay--;
+                    if (currentPlay == 0) return currentPlay;
+                    else if (currentPlay < 0) return numOfMusic - 1;
+                    else return currentPlay;
+                case 2:
+                    return currentPlay;
+                case 3:
+                    Random rdm = new Random(unchecked((int)DateTime.Now.Ticks));
+                    currentPlay = rdm.Next() % numOfMusic;
+                    if (currentPlay == 0) return numOfMusic;
+                    else return currentPlay;
+                default:
+                    return 0;
+            }
+        }
+        public int NextPlay(int type)
+        {
+            /* type = 0 顺序
+
+          　　type = 1 重复播放全部
+          　　type = 2 重复播放一首
+          　　type = 3 随机播放
+
+          　　*/
+            switch (type)
+            {
+                case 0:
+                    currentPlay++;
+                    if (currentPlay >= numOfMusic) return 0;
+                    else return currentPlay;
+                case 1:
+                    currentPlay++;
+                    if (currentPlay >= numOfMusic) return 1;
+                    else return currentPlay;
+                case 2:
+                    return currentPlay;
+                case 3:
+                    Random rdm = new Random(unchecked((int)DateTime.Now.Ticks));
+                    currentPlay = rdm.Next() % numOfMusic;
+                    if (currentPlay == 0) return numOfMusic;
+                    else return currentPlay;
+                default:
+                    return 0;
+            }
+        }
+    }
+选择歌曲文件
+private void btnOpen_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog fileDialog = new OpenFileDialog();
+            fileDialog.Multiselect = true;
+            fileDialog.DefaultExt = "*.mp3|*.mp4";
+            fileDialog.ShowDialog();
+            if (fileDialog.FileNames.Count() <= 0)
+                return;
+            var list = new List<MusicInfo>();
+            lvwData.Items.Clear();
+            myplayer = new Player(mediaplayer);
+            musicList = new List<MusicInfo>();
+            foreach (var item in fileDialog.FileNames)
+            {
+                ListViewItem li = new ListViewItem();
+                li.Tag = Guid.NewGuid().ToString();
+                var songName = item.Substring(item.LastIndexOf('\\') + 1).Split('.')[0];
+                li.Text = songName;
+                li.SubItems.Add(item);
+                lvwData.Items.Add(li);
+                myplayer.AddFile(item);
+                var media = mediaplayer.newMedia(item);
+                mediaplayer.currentPlaylist.appendItem(media);
+                musicList.Add(GetMusicInfo(item));
+            }
+            if (lvwData.Items.Count <= 0)
+                return;
+            myplayer.play(0);
+            SetListviewColor(lvwData.Items[0]);
+            InitProgress(musicList[0]);
+        }
+获取歌曲时长
+引用dll及com中的dll
+using Shell32;
+using System.Text.RegularExpressions;
+private MusicInfo GetMusicInfo(string songPath)
+        {
+            string dirName = Path.GetDirectoryName(songPath);
+            var SongName = Path.GetFileName(songPath);//获得歌曲名称
+            FileInfo fInfo = new FileInfo(songPath);
+            var sh = new ShellClass();
+            Folder dir = sh.NameSpace(dirName);
+            FolderItem item = dir.ParseName(SongName);
+            var song = dir.GetDetailsOf(item, -1);
+            var songsize = song.Split('\n')[1].Split(':')[1];
+            var songtime = song.Substring(song.IndexOf("时长") + 3).Trim();
+            return new MusicInfo { SongName = SongName.Split('.')[0], SongSize = songsize, SongTime = songtime, SongTimeLength = MusicTool.GetTimeLength(Convert.ToDateTime(songtime)), SongUrl = songPath };
+        }
